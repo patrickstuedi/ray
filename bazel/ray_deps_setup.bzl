@@ -77,6 +77,13 @@ def auto_http_archive(*, name=None, url=None, urls=True,
 
 def ray_deps_setup():
 
+    http_archive(
+        name = "rules_foreign_cc",
+        sha256 = "d54742ffbdc6924f222d2179f0e10e911c5c659c4ae74158e9fe827aad862ac6",
+        strip_prefix = "rules_foreign_cc-0.2.0",
+        url = "https://github.com/bazelbuild/rules_foreign_cc/archive/0.2.0.tar.gz",
+    )
+
     # Explicitly bring in protobuf dependency to work around
     # https://github.com/ray-project/ray/issues/14117
     http_archive(
@@ -274,3 +281,12 @@ def ray_deps_setup():
         urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/v0.3.0.tar.gz"],
         sha256 = "b7e13f0b4259e80c3070b583c2f39e53153085a6918718b1c710caf7037572b0",
     )
+
+    http_archive(
+        name = "com_github_patrickstuedi_rocksdb_cloud",
+        # NOTE: If you update this, also update @boringssl's hash.
+        url = "https://github.com/patrickstuedi/rocksdb-cloud/archive/refs/tags/0.0.1.tar.gz",
+        sha256 = "f44453224177aaa8ae2e5a312d5c88d6e6aeb0f6",
+    )
+
+

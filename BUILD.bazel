@@ -7,6 +7,7 @@ load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 load("@com_github_grpc_grpc//bazel:cython_library.bzl", "pyx_library")
 load("@com_github_google_flatbuffers//:build_defs.bzl", "flatbuffer_cc_library")
 load("//bazel:ray.bzl", "COPTS", "PYX_COPTS", "PYX_SRCS", "copy_to_workspace")
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 
 config_setting(
     name = "msvc-cl",
@@ -24,6 +25,15 @@ config_setting(
 )
 
 # === Begin of rpc definitions ===
+
+cmake(
+    name = "com_github_patrickstuedi_rocksdb_cloud",
+    cache_entries = {
+        "CMAKE_C_FLAGS": "-fPIC",
+    },
+    lib_source = "@com_github_patrickstuedi_rocksdb_cloud//:all_srcs",
+    out_static_libs = ["librocksdb.so"],
+)
 
 # GRPC common lib.
 cc_library(
