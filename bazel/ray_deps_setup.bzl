@@ -1,6 +1,14 @@
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 
+_ALL_CONTENT = """\
+filegroup(
+    name = "all_srcs",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+"""
+
 def urlsplit(url):
     """ Splits a URL like "https://example.com/a/b?c=d&e#f" into a tuple:
         ("https", ["example", "com"], ["a", "b"], ["c=d", "e"], "f")
@@ -283,10 +291,10 @@ def ray_deps_setup():
     )
 
     http_archive(
-        name = "com_github_patrickstuedi_rocksdb_cloud",
-        # NOTE: If you update this, also update @boringssl's hash.
+        name = "github_rocksdb_cloud",
         url = "https://github.com/patrickstuedi/rocksdb-cloud/archive/refs/tags/0.0.1.tar.gz",
-        sha256 = "f44453224177aaa8ae2e5a312d5c88d6e6aeb0f6",
+        sha256 = "f98c944a6dceb316f45030cc55c171ced8f784164a5e282ab4543f5da173b161",
+        build_file_content = _ALL_CONTENT
     )
 
 

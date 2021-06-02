@@ -34,12 +34,16 @@ filegroup(
 
 
 cmake(
-    name = "com_github_patrickstuedi_rocksdb_cloud",
-    cache_entries = {
-        "CMAKE_C_FLAGS": "-fPIC",
-    },
-    lib_source = ":srcs",
-    out_static_libs = ["librocksdb.so"],
+    name = "rocksdb_cloud",
+		cache_entries = {
+			"WITH_AWS": "ON",
+			"ROCKSDB_BUILD_SHARED": "ON",
+			"BUILD_SHARED_LIBS": "ON"
+		},
+		lib_source = "@github_rocksdb_cloud//:all_srcs",
+		#lib_source = ":src",
+		#lib_source = "@github_rocksdb_cloud//:rocksdb_all",
+    out_shared_libs = ["librocksdb.so"],
 )
 
 # GRPC common lib.
