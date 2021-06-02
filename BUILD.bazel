@@ -26,12 +26,19 @@ config_setting(
 
 # === Begin of rpc definitions ===
 
+filegroup(
+    name = "srcs",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
+
 cmake(
     name = "com_github_patrickstuedi_rocksdb_cloud",
     cache_entries = {
         "CMAKE_C_FLAGS": "-fPIC",
     },
-    lib_source = "@com_github_patrickstuedi_rocksdb_cloud//:all_srcs",
+    lib_source = ":srcs",
     out_static_libs = ["librocksdb.so"],
 )
 
@@ -709,6 +716,7 @@ cc_library(
         "@boost//:fiber",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
+				":com_github_patrickstuedi_rocksdb_cloud",
     ],
 )
 
