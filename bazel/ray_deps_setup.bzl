@@ -4,7 +4,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file"
 _ALL_CONTENT = """\
 filegroup(
     name = "all_srcs",
-    srcs = glob(["**"]),
+    srcs = glob(["rocksdb-cloud-0.0.1/**"]),
     visibility = ["//visibility:public"],
 )
 """
