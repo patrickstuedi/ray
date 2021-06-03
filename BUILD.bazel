@@ -40,6 +40,10 @@ cmake(
 			"ROCKSDB_BUILD_SHARED": "ON",
 			"BUILD_SHARED_LIBS": "ON"
 		},
+    env_vars = {
+				"CFLAGS": "-Dredacted='\\\"redacted\\\"'",
+				"CXXFLAGS": "-Dredacted='\\\"redacted\\\"'"
+		},
 		lib_source = "@github_rocksdb_cloud//:all_srcs",
 		#lib_source = ":src",
 		#lib_source = "@github_rocksdb_cloud//:rocksdb_all",
