@@ -724,7 +724,7 @@ cc_library(
         "@boost//:fiber",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
-				":com_github_patrickstuedi_rocksdb_cloud",
+				":rocksdb_cloud",
     ],
 )
 
