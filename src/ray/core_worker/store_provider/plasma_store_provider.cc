@@ -17,6 +17,7 @@
 #include "ray/common/ray_config.h"
 #include "ray/core_worker/context.h"
 #include "ray/core_worker/core_worker.h"
+#include "ray/util/util.h"
 #include "src/ray/protobuf/gcs.pb.h"
 
 namespace ray {
@@ -60,6 +61,8 @@ CoreWorkerPlasmaStoreProvider::CoreWorkerPlasmaStoreProvider(
     : raylet_client_(raylet_client),
       reference_counter_(reference_counter),
       check_signals_(check_signals) {
+  RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Constructor";
+
   if (get_current_call_site != nullptr) {
     get_current_call_site_ = get_current_call_site;
   } else {
@@ -86,6 +89,9 @@ Status CoreWorkerPlasmaStoreProvider::Put(const RayObject &object,
                                           const ObjectID &object_id,
                                           const rpc::Address &owner_address,
                                           bool *object_exists) {
+  size_t datasize = object.HasData() ? object.GetData()->Size() : 0;
+  RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Put, size " << datasize;
+
   RAY_CHECK(!object.IsInPlasmaError()) << object_id;
   std::shared_ptr<Buffer> data;
   RAY_RETURN_NOT_OK(Create(object.GetMetadata(),
@@ -112,12 +118,14 @@ Status CoreWorkerPlasmaStoreProvider::Create(const std::shared_ptr<Buffer> &meta
                                              const ObjectID &object_id,
                                              const rpc::Address &owner_address,
                                              std::shared_ptr<Buffer> *data) {
+  RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Create, data_size " << data_size;
   uint64_t retry_with_request_id = 0;
   Status status = store_client_.Create(
       object_id, owner_address, data_size, metadata ? metadata->Data() : nullptr,
       metadata ? metadata->Size() : 0, &retry_with_request_id, data,
       /*device_num=*/0);
 
+  RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Create, status 1 " << status;
   while (retry_with_request_id > 0) {
     // TODO(sang): Use exponential backoff instead.
     std::this_thread::sleep_for(std::chrono::milliseconds(object_store_full_delay_ms_));
@@ -126,9 +134,11 @@ Status CoreWorkerPlasmaStoreProvider::Create(const std::shared_ptr<Buffer> &meta
     status = store_client_.RetryCreate(object_id, retry_with_request_id,
                                        metadata ? metadata->Data() : nullptr,
                                        &retry_with_request_id, data);
+    RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Create, status 2 " << status;
   }
 
   if (status.IsObjectStoreFull()) {
+    RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Create, status 3 " << status;
     RAY_LOG(ERROR) << "Failed to put object " << object_id
                    << " in object store because it "
                    << "is full. Object size is " << data_size << " bytes.\n"
@@ -144,12 +154,16 @@ Status CoreWorkerPlasmaStoreProvider::Create(const std::shared_ptr<Buffer> &meta
             << "is full. Object size is " << data_size << " bytes.";
     status = Status::ObjectStoreFull(message.str());
   } else if (status.IsObjectExists()) {
+    RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Create, status 4 " << status;
     RAY_LOG(WARNING) << "Trying to put an object that already existed in plasma: "
                      << object_id << ".";
     status = Status::OK();
   } else {
+    RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Create, status 5 " << status;
     RAY_RETURN_NOT_OK(status);
   }
+  RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Create, status 6 " << status;
+
   return status;
 }
 
@@ -342,6 +356,7 @@ Status CoreWorkerPlasmaStoreProvider::Get(
 
 Status CoreWorkerPlasmaStoreProvider::Contains(const ObjectID &object_id,
                                                bool *has_object) {
+  RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Contains";
   return store_client_.Contains(object_id, has_object);
 }
 

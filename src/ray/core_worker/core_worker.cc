@@ -961,6 +961,7 @@ CoreWorker::GetAllReferenceCounts() const {
 }
 
 void CoreWorker::PutObjectIntoPlasma(const RayObject &object, const ObjectID &object_id) {
+  RAY_LOG(INFO) << "### CoreWorker::PutObjectIntoPlasma";
   bool object_exists;
   // This call will only be used by PromoteObjectToPlasma, which means that the
   // object will always owned by us.
@@ -1036,6 +1037,7 @@ Status CoreWorker::SetClientOptions(std::string name, int64_t limit_bytes) {
 Status CoreWorker::Put(const RayObject &object,
                        const std::vector<ObjectID> &contained_object_ids,
                        ObjectID *object_id) {
+  RAY_LOG(INFO) << "### CoreWorker::Put";
   *object_id = ObjectID::FromIndex(worker_context_.GetCurrentTaskID(),
                                    worker_context_.GetNextPutIndex());
   reference_counter_->AddOwnedObject(
@@ -1051,6 +1053,7 @@ Status CoreWorker::Put(const RayObject &object,
 Status CoreWorker::Put(const RayObject &object,
                        const std::vector<ObjectID> &contained_object_ids,
                        const ObjectID &object_id, bool pin_object) {
+  RAY_LOG(INFO) << "### CoreWorker::Put, local modde " << options_.is_local_mode;
   bool object_exists;
   if (options_.is_local_mode ||
       (RayConfig::instance().put_small_object_in_memory_store() &&
@@ -1087,6 +1090,7 @@ Status CoreWorker::CreateOwned(const std::shared_ptr<Buffer> &metadata,
                                const size_t data_size,
                                const std::vector<ObjectID> &contained_object_ids,
                                ObjectID *object_id, std::shared_ptr<Buffer> *data) {
+  RAY_LOG(INFO) << "### CoreWorker::CreateOwned, data_size " << data_size;
   *object_id = ObjectID::FromIndex(worker_context_.GetCurrentTaskID(),
                                    worker_context_.GetNextPutIndex());
   reference_counter_->AddOwnedObject(*object_id, contained_object_ids, rpc_address_,
@@ -1113,6 +1117,7 @@ Status CoreWorker::CreateExisting(const std::shared_ptr<Buffer> &metadata,
                                   const size_t data_size, const ObjectID &object_id,
                                   const rpc::Address &owner_address,
                                   std::shared_ptr<Buffer> *data) {
+  RAY_LOG(INFO) << "### CoreWorker::CreateExisting ";
   if (options_.is_local_mode) {
     return Status::NotImplemented(
         "Creating an object with a pre-existing ObjectID is not supported in local "
@@ -2818,15 +2823,16 @@ void CoreWorker::HandleExit(const rpc::ExitRequest &request, rpc::ExitReply *rep
   // any object pinning RPCs in flight.
   bool is_idle = !own_objects && pins_in_flight == 0;
   reply->set_success(is_idle);
-  send_reply_callback(Status::OK(),
-                      [this, is_idle]() {
-                        // If the worker is idle, we exit.
-                        if (is_idle) {
-                          Exit(rpc::WorkerExitType::INTENDED_EXIT);
-                        }
-                      },
-                      // We need to kill it regardless if the RPC failed.
-                      [this]() { Exit(rpc::WorkerExitType::INTENDED_EXIT); });
+  send_reply_callback(
+      Status::OK(),
+      [this, is_idle]() {
+        // If the worker is idle, we exit.
+        if (is_idle) {
+          Exit(rpc::WorkerExitType::INTENDED_EXIT);
+        }
+      },
+      // We need to kill it regardless if the RPC failed.
+      [this]() { Exit(rpc::WorkerExitType::INTENDED_EXIT); });
 }
 
 void CoreWorker::YieldCurrentFiber(FiberEvent &event) {

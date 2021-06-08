@@ -305,7 +305,8 @@ PlasmaError PlasmaStore::CreateObject(const ObjectID &object_id,
                                       int64_t metadata_size, int device_num,
                                       const std::shared_ptr<Client> &client,
                                       PlasmaObject *result) {
-  RAY_LOG(DEBUG) << "attempting to create object " << object_id << " size " << data_size;
+  RAY_LOG(INFO) << "### PlasmaStore::CreateObject attempting to create object "
+                << object_id << " size " << data_size;
 
   auto entry = GetObjectTableEntry(&store_info_, object_id);
   if (entry != nullptr) {
@@ -928,6 +929,7 @@ void PlasmaStore::ProcessCreateRequests() {
   // that means that the first request is currently not serviceable because
   // there is not enough memory. In that case, we should wait for the timer to
   // expire before trying any requests again.
+  RAY_LOG(INFO) << "PlasmaStore::ProcessCreateRequests";
   if (create_timer_) {
     return;
   }
@@ -940,12 +942,13 @@ void PlasmaStore::ProcessCreateRequests() {
 
   if (retry_after_ms > 0) {
     // Try to process requests later, after space has been made.
-    create_timer_ = execute_after(io_context_,
-                                  [this]() {
-                                    create_timer_ = nullptr;
-                                    ProcessCreateRequests();
-                                  },
-                                  retry_after_ms);
+    create_timer_ = execute_after(
+        io_context_,
+        [this]() {
+          create_timer_ = nullptr;
+          ProcessCreateRequests();
+        },
+        retry_after_ms);
   }
 }
 

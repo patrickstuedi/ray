@@ -173,6 +173,8 @@ std::shared_ptr<RayObject> CoreWorkerMemoryStore::GetOrPromoteToPlasma(
 }
 
 bool CoreWorkerMemoryStore::Put(const RayObject &object, const ObjectID &object_id) {
+  RAY_LOG(INFO) << "### CoreWorkerMemoryStore::Put";
+  // RAY_LOG(INFO) << "### CoreWorkerMemoryStore::Put, size " << object.GetData()->Size();
   std::vector<std::function<void(std::shared_ptr<RayObject>)>> async_callbacks;
   auto object_entry = std::make_shared<RayObject>(object.GetData(), object.GetMetadata(),
                                                   object.GetNestedIds(), true);
@@ -235,6 +237,8 @@ bool CoreWorkerMemoryStore::Put(const RayObject &object, const ObjectID &object_
   // Must be called without holding the lock because store_in_plasma_ goes
   // through the regular CoreWorker::Put() codepath, which calls into the
   // in-memory store (would cause deadlock).
+  RAY_LOG(INFO) << "### CoreWorkerMemoryStore::Put, storing in plasma "
+                << should_put_in_plasma;
   if (should_put_in_plasma) {
     store_in_plasma_(object, object_id);
     stored_in_direct_memory = false;

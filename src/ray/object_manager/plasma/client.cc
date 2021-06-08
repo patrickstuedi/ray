@@ -19,17 +19,15 @@
 
 #include "ray/object_manager/plasma/client.h"
 
-#include <cstring>
-
 #include <algorithm>
+#include <boost/asio.hpp>
+#include <cstring>
 #include <deque>
 #include <mutex>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-#include <boost/asio.hpp>
 
 #include "ray/common/asio/instrumented_io_context.h"
 #include "ray/object_manager/plasma/connection.h"
@@ -322,6 +320,7 @@ Status PlasmaClient::Impl::Create(const ObjectID &object_id,
                                   int64_t data_size, const uint8_t *metadata,
                                   int64_t metadata_size, uint64_t *retry_with_request_id,
                                   std::shared_ptr<Buffer> *data, int device_num) {
+  RAY_LOG(INFO) << "### PlasmaClient::Impl::Create, data_size " << data_size;
   std::lock_guard<std::recursive_mutex> guard(client_mutex_);
 
   RAY_LOG(DEBUG) << "called plasma_create on conn " << store_conn_ << " with size "
