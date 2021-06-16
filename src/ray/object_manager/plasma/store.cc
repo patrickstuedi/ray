@@ -29,8 +29,10 @@
 #include "ray/object_manager/plasma/store.h"
 
 #include <limits.h>
+#include <rocksdb/status.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <boost/bind.hpp>
 #include <chrono>
@@ -49,6 +51,7 @@
 #include "ray/object_manager/plasma/malloc.h"
 #include "ray/object_manager/plasma/plasma_allocator.h"
 #include "ray/object_manager/plasma/protocol.h"
+#include "ray/util/rocks.h"
 #include "ray/util/util.h"
 
 namespace fb = plasma::flatbuf;
@@ -130,6 +133,12 @@ GetRequest::GetRequest(instrumented_io_context &io_context,
   num_objects_to_wait_for = unique_ids.size();
 }
 
+std::string kDBPath = "/tmp/rocksdb_cloud_durable";
+std::string kBucketSuffix = "cloud.durable.example.";
+std::string kRegion = "us-west-2";
+static const bool flushAtEnd = true;
+static const bool disableWAL = true;
+
 PlasmaStore::PlasmaStore(instrumented_io_context &main_service, std::string directory,
                          bool hugepages_enabled, const std::string &socket_name,
                          uint32_t delay_on_oom_ms,
@@ -155,14 +164,60 @@ PlasmaStore::PlasmaStore(instrumented_io_context &main_service, std::string dire
           []() { return absl::GetCurrentTimeNanos(); }) {
   store_info_.directory = directory;
   store_info_.hugepages_enabled = hugepages_enabled;
+  CloudEnvOptions cloud_env_options;
+
+  if (!cloud_env_options.credentials.HasValid().ok()) {
+    RAY_LOG(INFO) << "### rocks: lease set env variables for rocksdb";
+  }
+
+  char *user = getenv("USER");
+  kBucketSuffix.append(user);
+
+  const std::string bucketPrefix = "rockset.";
+  cloud_env_options.src_bucket.SetBucketName(kBucketSuffix, bucketPrefix);
+  cloud_env_options.dest_bucket.SetBucketName(kBucketSuffix, bucketPrefix);
+
+  const std::string bucketName = bucketPrefix + kBucketSuffix;
+  RAY_LOG(INFO) << "### rocks: creds " << cloud_env_options.credentials.access_key_id
+                << ", user " << kBucketSuffix << ", bucketname " << bucketName;
+
+  // CloudEnv *cenv;
+  rocksdb::Status s =
+      CloudEnv::NewAwsEnv(Env::Default(), kBucketSuffix, kDBPath, kRegion, kBucketSuffix,
+                          kDBPath, kRegion, cloud_env_options, nullptr, &cenv);
+  if (!s.ok()) {
+    RAY_LOG(INFO) << "### rocks: Unable to create cloud env in bucket";
+  }
+  cloud_env.reset(cenv);
+
+  Options options;
+  options.env = cloud_env.get();
+  options.create_if_missing = true;
+  options.error_if_exists = true;
+  std::string persistent_cache = "";
+
+  WriteOptions wopt;
+  wopt.disableWAL = disableWAL;
+
+  // DBCloud* db;
+  s = DBCloud::Open(options, kDBPath, persistent_cache, 0, &db_);
+  if (!s.ok()) {
+    RAY_LOG(INFO) << "### rocks: Unable to open db at path with bucket";
+  }
+
+  // ray::run_rocks();
 }
 
 // TODO(pcm): Get rid of this destructor by using RAII to clean up data.
-PlasmaStore::~PlasmaStore() {}
+PlasmaStore::~PlasmaStore() {
+  delete db_;
+  // ray::stop_rocks();
+}
 
 void PlasmaStore::Start() {
   // Start listening for clients.
   DoAccept();
+  // ray::run_rocks();
 }
 
 void PlasmaStore::Stop() { acceptor_.close(); }
@@ -307,6 +362,13 @@ PlasmaError PlasmaStore::CreateObject(const ObjectID &object_id,
                                       PlasmaObject *result) {
   RAY_LOG(INFO) << "### PlasmaStore::CreateObject attempting to create object "
                 << object_id << " size " << data_size;
+
+  WriteOptions wopt;
+  wopt.disableWAL = disableWAL;
+  rocksdb::Status s = db_->Put(wopt, "keyray", "value");
+  std::string value;
+  s = db_->Get(ReadOptions(), "keyray", &value);
+  RAY_LOG(INFO) << "### rocks: value " << value;
 
   auto entry = GetObjectTableEntry(&store_info_, object_id);
   if (entry != nullptr) {

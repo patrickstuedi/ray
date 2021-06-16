@@ -23,6 +23,7 @@
 #include "ray/gcs/gcs_client/service_based_gcs_client.h"
 #include "ray/raylet/raylet.h"
 #include "ray/stats/stats.h"
+#include "ray/util/rocks.h"
 
 DEFINE_string(raylet_socket_name, "", "The socket name of raylet.");
 DEFINE_string(store_socket_name, "", "The socket name of object store.");
@@ -69,6 +70,9 @@ int main(int argc, char *argv[]) {
                                          ray::RayLogLevel::INFO,
                                          /*log_dir=*/"");
   ray::RayLog::InstallFailureSignalHandler();
+
+  // ray::run_rocks();
+  // ray::stop_rocks();
 
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   const std::string raylet_socket_name = FLAGS_raylet_socket_name;
@@ -276,7 +280,6 @@ int main(int argc, char *argv[]) {
   signals.add(SIGTERM);
 #endif
   signals.async_wait(handler);
-
   main_service.run();
 }
 #endif

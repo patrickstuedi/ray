@@ -35,6 +35,10 @@
 #include "ray/object_manager/plasma/plasma_allocator.h"
 #include "ray/object_manager/plasma/protocol.h"
 #include "ray/object_manager/plasma/quota_aware_policy.h"
+#include "rocksdb/cloud/db_cloud.h"
+#include "rocksdb/options.h"
+
+using namespace ROCKSDB_NAMESPACE;
 
 namespace plasma {
 
@@ -317,6 +321,11 @@ class PlasmaStore {
 
   /// Total plasma object bytes that are consumed by core workers.
   int64_t total_consumed_bytes_ = 0;
+
+  // rocksdb stuff
+  DBCloud *db_;
+  CloudEnv *cenv;
+  std::unique_ptr<CloudEnv> cloud_env;
 };
 
 }  // namespace plasma

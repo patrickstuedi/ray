@@ -20,6 +20,7 @@
 #include <iostream>
 
 #include "ray/common/status.h"
+#include "ray/util/rocks.h"
 #include "ray/util/util.h"
 
 namespace {
@@ -102,6 +103,7 @@ void Raylet::Start() {
 
   // Start listening for clients.
   DoAccept();
+  // run_rocks();
 }
 
 void Raylet::Stop() {
