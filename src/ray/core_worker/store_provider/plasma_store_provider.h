@@ -89,7 +89,7 @@ class TrackedBuffer : public Buffer {
 class CoreWorkerPlasmaStoreProvider {
  public:
   CoreWorkerPlasmaStoreProvider(
-      const std::string &store_socket,
+      const WorkerID &worker_id, const std::string &store_socket,
       const std::shared_ptr<raylet::RayletClient> raylet_client,
       const std::shared_ptr<ReferenceCounter> reference_counter,
       std::function<Status()> check_signals, bool warmup,
@@ -222,6 +222,11 @@ class CoreWorkerPlasmaStoreProvider {
   uint32_t object_store_full_delay_ms_;
   // Pointer to the shared buffer tracker.
   std::shared_ptr<BufferTracker> buffer_tracker_;
+
+  // rocksdb stuff
+  DBCloud *db_;
+  CloudEnv *cenv;
+  std::unique_ptr<CloudEnv> cloud_env;
 };
 
 }  // namespace ray

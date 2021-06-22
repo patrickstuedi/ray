@@ -52,8 +52,14 @@ BufferTracker::UsedObjects() const {
   return used;
 }
 
+std::string kDBPath = "/tmp/rocksdb_cloud_durable";
+std::string kBucketSuffix = "cloud.durable.example.";
+std::string kRegion = "us-west-2";
+static const bool flushAtEnd = true;
+static const bool disableWAL = true;
+
 CoreWorkerPlasmaStoreProvider::CoreWorkerPlasmaStoreProvider(
-    const std::string &store_socket,
+    const WorkerID &worker_id, const std::string &store_socket,
     const std::shared_ptr<raylet::RayletClient> raylet_client,
     const std::shared_ptr<ReferenceCounter> reference_counter,
     std::function<Status()> check_signals, bool warmup,
@@ -74,10 +80,52 @@ CoreWorkerPlasmaStoreProvider::CoreWorkerPlasmaStoreProvider(
   if (warmup) {
     RAY_CHECK_OK(WarmupStore());
   }
+
+  CloudEnvOptions cloud_env_options;
+
+  if (!cloud_env_options.credentials.HasValid().ok()) {
+    RAY_LOG(INFO) << "### rocks: lease set env variables for rocksdb";
+  }
+
+  char *user = getenv("USER");
+  kBucketSuffix.append(user);
+
+  const std::string bucketPrefix = "rockset.";
+  cloud_env_options.src_bucket.SetBucketName(kBucketSuffix, bucketPrefix);
+  cloud_env_options.dest_bucket.SetBucketName(kBucketSuffix, bucketPrefix);
+
+  const std::string bucketName = bucketPrefix + kBucketSuffix;
+  RAY_LOG(INFO) << "### rocks: creds " << cloud_env_options.credentials.access_key_id
+                << ", user " << kBucketSuffix << ", bucketname " << bucketName;
+
+  // CloudEnv *cenv;
+  rocksdb::Status s =
+      CloudEnv::NewAwsEnv(Env::Default(), kBucketSuffix, kDBPath, kRegion, kBucketSuffix,
+                          kDBPath, kRegion, cloud_env_options, nullptr, &cenv);
+  if (!s.ok()) {
+    RAY_LOG(INFO) << "### rocks: Unable to create cloud env in bucket";
+  }
+  cloud_env.reset(cenv);
+
+  Options options;
+  options.env = cloud_env.get();
+  options.create_if_missing = true;
+  options.error_if_exists = true;
+  std::string persistent_cache = "";
+
+  WriteOptions wopt;
+  wopt.disableWAL = disableWAL;
+
+  // DBCloud* db;
+  s = DBCloud::Open(options, kDBPath, persistent_cache, 0, &db_);
+  if (!s.ok()) {
+    RAY_LOG(INFO) << "### rocks: Unable to open db at path with bucket";
+  }
 }
 
 CoreWorkerPlasmaStoreProvider::~CoreWorkerPlasmaStoreProvider() {
   RAY_IGNORE_EXPR(store_client_.Disconnect());
+  delete db_;
 }
 
 Status CoreWorkerPlasmaStoreProvider::SetClientOptions(std::string name,
@@ -168,6 +216,7 @@ Status CoreWorkerPlasmaStoreProvider::Create(const std::shared_ptr<Buffer> &meta
 }
 
 Status CoreWorkerPlasmaStoreProvider::Seal(const ObjectID &object_id) {
+  RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Seal";
   return store_client_.Seal(object_id);
 }
 
@@ -180,6 +229,7 @@ Status CoreWorkerPlasmaStoreProvider::FetchAndGetFromPlasmaStore(
     int64_t timeout_ms, bool fetch_only, bool in_direct_call, const TaskID &task_id,
     absl::flat_hash_map<ObjectID, std::shared_ptr<RayObject>> *results,
     bool *got_exception) {
+  RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::FetchAndGetFromPlasmaStore";
   const auto owner_addresses = reference_counter_->GetOwnerAddresses(batch_ids);
   RAY_RETURN_NOT_OK(raylet_client_->FetchOrReconstruct(
       batch_ids, owner_addresses, fetch_only, /*mark_worker_blocked*/ !in_direct_call,
@@ -223,6 +273,7 @@ Status CoreWorkerPlasmaStoreProvider::FetchAndGetFromPlasmaStore(
 Status CoreWorkerPlasmaStoreProvider::GetIfLocal(
     const std::vector<ObjectID> &object_ids,
     absl::flat_hash_map<ObjectID, std::shared_ptr<RayObject>> *results) {
+  RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::GetIfLocal";
   std::vector<plasma::ObjectBuffer> plasma_results;
   // Since this path is used only for spilling, we should set is_from_worker: false.
   RAY_RETURN_NOT_OK(store_client_.Get(object_ids, /*timeout_ms=*/0, &plasma_results,
@@ -271,6 +322,7 @@ Status CoreWorkerPlasmaStoreProvider::Get(
     const WorkerContext &ctx,
     absl::flat_hash_map<ObjectID, std::shared_ptr<RayObject>> *results,
     bool *got_exception) {
+  RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Get";
   int64_t batch_size = RayConfig::instance().worker_fetch_request_size();
   std::vector<ObjectID> batch_ids;
   absl::flat_hash_set<ObjectID> remaining(object_ids.begin(), object_ids.end());

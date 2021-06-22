@@ -156,6 +156,7 @@ void CoreWorkerMemoryStore::GetAsync(
 
 std::shared_ptr<RayObject> CoreWorkerMemoryStore::GetOrPromoteToPlasma(
     const ObjectID &object_id) {
+  RAY_LOG(INFO) << "### CoreWorkerMemoryStore::GetOrPromoteToPlasma";
   absl::MutexLock lock(&mu_);
   auto iter = objects_.find(object_id);
   if (iter != objects_.end()) {
