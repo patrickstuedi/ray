@@ -362,14 +362,14 @@ PlasmaError PlasmaStore::CreateObject(const ObjectID &object_id,
                                       PlasmaObject *result) {
   RAY_LOG(INFO) << "### PlasmaStore::CreateObject attempting to create object "
                 << object_id << " size " << data_size;
-
-  WriteOptions wopt;
-  wopt.disableWAL = disableWAL;
-  rocksdb::Status s = db_->Put(wopt, "keyray", "value");
-  std::string value;
-  s = db_->Get(ReadOptions(), "keyray", &value);
-  RAY_LOG(INFO) << "### rocks: value " << value;
-
+  /*
+    WriteOptions wopt;
+    wopt.disableWAL = disableWAL;
+    rocksdb::Status s = db_->Put(wopt, "keyray", "value");
+    std::string value;
+    s = db_->Get(ReadOptions(), "keyray", &value);
+    RAY_LOG(INFO) << "### rocks: value " << value;
+  */
   auto entry = GetObjectTableEntry(&store_info_, object_id);
   if (entry != nullptr) {
     // There is already an object with the same ID in the Plasma Store, so
@@ -491,6 +491,8 @@ void PlasmaStore::RemoveGetRequestsForClient(const std::shared_ptr<Client> &clie
 void PlasmaStore::ReturnFromGet(const std::shared_ptr<GetRequest> &get_req) {
   // If the get request is already removed, do no-op. This can happen because the boost
   // timer is not atomic. See https://github.com/ray-project/ray/pull/15071.
+
+  RAY_LOG(INFO) << "### ReturnFromGet";
   if (get_req->IsRemoved()) {
     return;
   }
@@ -500,6 +502,7 @@ void PlasmaStore::ReturnFromGet(const std::shared_ptr<GetRequest> &get_req) {
   std::vector<MEMFD_TYPE> store_fds;
   std::vector<int64_t> mmap_sizes;
   for (const auto &object_id : get_req->object_ids) {
+    RAY_LOG(INFO) << "### ReturnFromGet, obj_id " << object_id;
     PlasmaObject &object = get_req->objects[object_id];
     MEMFD_TYPE fd = object.store_fd;
     if (object.data_size != -1 && fds_to_send.count(fd) == 0 && fd != INVALID_FD) {
@@ -582,10 +585,12 @@ void PlasmaStore::UpdateObjectGetRequests(const ObjectID &object_id) {
 void PlasmaStore::ProcessGetRequest(const std::shared_ptr<Client> &client,
                                     const std::vector<ObjectID> &object_ids,
                                     int64_t timeout_ms, bool is_from_worker) {
+  RAY_LOG(INFO) << "### ProcessGetRequest";
   // Create a get request for this object.
   auto get_req = std::make_shared<GetRequest>(
       GetRequest(io_context_, client, object_ids, is_from_worker));
   for (auto object_id : object_ids) {
+    RAY_LOG(INFO) << "### ProcessGetRequest, object_id " << object_id;
     // Check if this object is already present
     // locally. If so, record that the object is being used and mark it as accounted for.
     auto entry = GetObjectTableEntry(&store_info_, object_id);
@@ -866,6 +871,8 @@ Status PlasmaStore::ProcessMessage(const std::shared_ptr<Client> &client,
   size_t input_size = message.size();
   ObjectID object_id;
 
+  RAY_LOG(INFO) << "### ProcessMessage, type " << static_cast<uint64_t>(type);
+
   // Process the different types of requests.
   switch (type) {
   case fb::MessageType::PlasmaCreateRequest: {
@@ -1032,7 +1039,7 @@ void PlasmaStore::ReplyToCreateClient(const std::shared_ptr<Client> &client,
                   << (result.data_size + result.metadata_size) / 1024 / 1024 << " MB.";
   }
   if (finished) {
-    RAY_LOG(DEBUG) << "Finishing create object " << object_id << " request ID " << req_id;
+    RAY_LOG(INFO) << "Finishing create object " << object_id << " request ID " << req_id;
     if (SendCreateReply(client, object_id, result, error).ok() &&
         error == PlasmaError::OK && result.device_num == 0) {
       static_cast<void>(client->SendFd(result.store_fd));

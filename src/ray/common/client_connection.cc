@@ -182,6 +182,8 @@ ray::Status ServerConnection::WriteMessage(int64_t type, int64_t length,
   sync_writes_ += 1;
   bytes_written_ += length;
 
+  RAY_LOG(INFO) << "### client_connection, WriteMessage, type " << type;
+
   auto write_cookie = RayConfig::instance().ray_cookie();
   return WriteBuffer({
       boost::asio::buffer(&write_cookie, sizeof(write_cookie)),
@@ -221,6 +223,8 @@ void ServerConnection::WriteMessageAsync(
     const std::function<void(const ray::Status &)> &handler) {
   async_writes_ += 1;
   bytes_written_ += length;
+
+  RAY_LOG(INFO) << "### client_connection, WriteMessage async, type " << type;
 
   auto write_buffer = std::make_unique<AsyncWriteBuffer>();
   write_buffer->write_cookie = RayConfig::instance().ray_cookie();

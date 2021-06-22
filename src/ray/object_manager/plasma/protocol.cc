@@ -120,6 +120,10 @@ Status PlasmaSend(const std::shared_ptr<StoreConn> &store_conn, MessageType mess
     return Status::IOError("Connection is closed.");
   }
   fbb->Finish(message);
+
+  RAY_LOG(INFO) << "### Protocol::PlasmaSend, type "
+                << static_cast<uint64_t>(message_type) << ", create type "
+                << static_cast<uint64_t>(MessageType::PlasmaCreateRequest);
   return store_conn->WriteMessage(static_cast<int64_t>(message_type), fbb->GetSize(),
                                   fbb->GetBufferPointer());
 }
@@ -131,6 +135,9 @@ Status PlasmaSend(const std::shared_ptr<Client> &client, MessageType message_typ
     return Status::IOError("Connection is closed.");
   }
   fbb->Finish(message);
+  RAY_LOG(INFO) << "### Protocol::PlasmaSend, type "
+                << static_cast<uint64_t>(message_type) << ", create type "
+                << static_cast<uint64_t>(MessageType::PlasmaCreateRequest);
   return client->WriteMessage(static_cast<int64_t>(message_type), fbb->GetSize(),
                               fbb->GetBufferPointer());
 }
@@ -227,6 +234,7 @@ Status SendCreateRetryRequest(const std::shared_ptr<StoreConn> &store_conn,
 Status SendCreateRequest(const std::shared_ptr<StoreConn> &store_conn, ObjectID object_id,
                          const ray::rpc::Address &owner_address, int64_t data_size,
                          int64_t metadata_size, int device_num, bool try_immediately) {
+  RAY_LOG(INFO) << "### Protocol::SendCreateRequest";
   flatbuffers::FlatBufferBuilder fbb;
   auto message = fb::CreatePlasmaCreateRequest(
       fbb, fbb.CreateString(object_id.Binary()),
@@ -241,6 +249,7 @@ void ReadCreateRequest(uint8_t *data, size_t size, ObjectID *object_id,
                        NodeID *owner_raylet_id, std::string *owner_ip_address,
                        int *owner_port, WorkerID *owner_worker_id, int64_t *data_size,
                        int64_t *metadata_size, int *device_num) {
+  RAY_LOG(INFO) << "### Protocol::ReadCreateRequest";
   RAY_DCHECK(data);
   auto message = flatbuffers::GetRoot<fb::PlasmaCreateRequest>(data);
   RAY_DCHECK(VerifyFlatbuffer(message, data, size));
@@ -268,6 +277,7 @@ Status SendUnfinishedCreateReply(const std::shared_ptr<Client> &client,
 
 Status SendCreateReply(const std::shared_ptr<Client> &client, ObjectID object_id,
                        const PlasmaObject &object, PlasmaError error_code) {
+  RAY_LOG(INFO) << "### Protocol::SendCreateReply";
   flatbuffers::FlatBufferBuilder fbb;
   PlasmaObjectSpec plasma_object(FD2INT(object.store_fd), object.data_offset,
                                  object.data_size, object.metadata_offset,
@@ -290,6 +300,7 @@ Status SendCreateReply(const std::shared_ptr<Client> &client, ObjectID object_id
 Status ReadCreateReply(uint8_t *data, size_t size, ObjectID *object_id,
                        uint64_t *retry_with_request_id, PlasmaObject *object,
                        MEMFD_TYPE *store_fd, int64_t *mmap_size) {
+  RAY_LOG(INFO) << "### Protocol::ReadCreateReply";
   RAY_DCHECK(data);
   auto message = flatbuffers::GetRoot<fb::PlasmaCreateReply>(data);
   RAY_DCHECK(VerifyFlatbuffer(message, data, size));
@@ -558,6 +569,7 @@ Status ReadEvictReply(uint8_t *data, size_t size, int64_t &num_bytes) {
 Status SendGetRequest(const std::shared_ptr<StoreConn> &store_conn,
                       const ObjectID *object_ids, int64_t num_objects, int64_t timeout_ms,
                       bool is_from_worker) {
+  RAY_LOG(INFO) << "### Protocol::SendGetRequest";
   flatbuffers::FlatBufferBuilder fbb;
   auto message = fb::CreatePlasmaGetRequest(
       fbb, ToFlatbuffer(&fbb, object_ids, num_objects), timeout_ms, is_from_worker);
@@ -566,6 +578,7 @@ Status SendGetRequest(const std::shared_ptr<StoreConn> &store_conn,
 
 Status ReadGetRequest(uint8_t *data, size_t size, std::vector<ObjectID> &object_ids,
                       int64_t *timeout_ms, bool *is_from_worker) {
+  RAY_LOG(INFO) << "### Protocol::ReadGetRequest";
   RAY_DCHECK(data);
   auto message = flatbuffers::GetRoot<fb::PlasmaGetRequest>(data);
   RAY_DCHECK(VerifyFlatbuffer(message, data, size));
@@ -584,10 +597,13 @@ Status SendGetReply(const std::shared_ptr<Client> &client, ObjectID object_ids[]
                     const std::vector<int64_t> &mmap_sizes) {
   flatbuffers::FlatBufferBuilder fbb;
   std::vector<PlasmaObjectSpec> objects;
-
+  RAY_LOG(INFO) << "### Protocol::SendGetReply";
   std::vector<flatbuffers::Offset<fb::CudaHandle>> handles;
   for (int64_t i = 0; i < num_objects; ++i) {
     const PlasmaObject &object = plasma_objects[object_ids[i]];
+    RAY_LOG(INFO) << "### Protocol::SendGetReply, obj_id " << object_ids[i]
+                  << ", data_size " << object.data_size << ", metadata_size "
+                  << object.metadata_size;
     objects.push_back(PlasmaObjectSpec(FD2INT(object.store_fd), object.data_offset,
                                        object.data_size, object.metadata_offset,
                                        object.metadata_size, object.device_num));
@@ -609,6 +625,7 @@ Status ReadGetReply(uint8_t *data, size_t size, ObjectID object_ids[],
                     PlasmaObject plasma_objects[], int64_t num_objects,
                     std::vector<MEMFD_TYPE> &store_fds,
                     std::vector<int64_t> &mmap_sizes) {
+  RAY_LOG(INFO) << "### Protocol::ReadGetReply";
   RAY_DCHECK(data);
   auto message = flatbuffers::GetRoot<fb::PlasmaGetReply>(data);
   RAY_DCHECK(VerifyFlatbuffer(message, data, size));
