@@ -131,6 +131,12 @@ GetRequest::GetRequest(instrumented_io_context &io_context,
   num_objects_to_wait_for = unique_ids.size();
 }
 
+std::string kDBPath = "/tmp/rocksdb_cloud_durable";
+std::string kBucketSuffix = "cloud.durable.example.";
+std::string kRegion = "us-west-2";
+static const bool flushAtEnd = true;
+static const bool disableWAL = true;
+
 PlasmaStore::PlasmaStore(instrumented_io_context &main_service, std::string directory,
                          std::string fallback_directory, bool hugepages_enabled,
                          const std::string &socket_name, uint32_t delay_on_oom_ms,
@@ -165,10 +171,52 @@ PlasmaStore::PlasmaStore(instrumented_io_context &main_service, std::string dire
   if (event_stats_print_interval_ms > 0 && RayConfig::instance().event_stats()) {
     PrintDebugDump();
   }
+
+  // rocksdb initialization
+  CloudEnvOptions cloud_env_options;
+
+  if (!cloud_env_options.credentials.HasValid().ok()) {
+    RAY_LOG(INFO) << "### rocks: lease set env variables for rocksdb";
+  }
+
+  char *user = getenv("USER");
+  kBucketSuffix.append(user);
+
+  const std::string bucketPrefix = "rockset.";
+  cloud_env_options.src_bucket.SetBucketName(kBucketSuffix, bucketPrefix);
+  cloud_env_options.dest_bucket.SetBucketName(kBucketSuffix, bucketPrefix);
+
+  const std::string bucketName = bucketPrefix + kBucketSuffix;
+  RAY_LOG(INFO) << "### rocks: creds " << cloud_env_options.credentials.access_key_id
+                << ", user " << kBucketSuffix << ", bucketname " << bucketName;
+
+  // CloudEnv *cenv;
+  rocksdb::Status s =
+      CloudEnv::NewAwsEnv(Env::Default(), kBucketSuffix, kDBPath, kRegion, kBucketSuffix,
+                          kDBPath, kRegion, cloud_env_options, nullptr, &cenv);
+  if (!s.ok()) {
+    RAY_LOG(INFO) << "### rocks: Unable to create cloud env in bucket";
+  }
+  cloud_env.reset(cenv);
+
+  Options options;
+  options.env = cloud_env.get();
+  options.create_if_missing = true;
+  options.error_if_exists = true;
+  std::string persistent_cache = "";
+
+  WriteOptions wopt;
+  wopt.disableWAL = disableWAL;
+
+  // DBCloud* db;
+  s = DBCloud::Open(options, kDBPath, persistent_cache, 0, &db_);
+  if (!s.ok()) {
+    RAY_LOG(INFO) << "### rocks: Unable to open db at path with bucket";
+  }
 }
 
 // TODO(pcm): Get rid of this destructor by using RAII to clean up data.
-PlasmaStore::~PlasmaStore() {}
+PlasmaStore::~PlasmaStore() { delete db_; }
 
 void PlasmaStore::Start() {
   // Start listening for clients.
@@ -350,6 +398,15 @@ PlasmaError PlasmaStore::CreateObject(const ObjectID &object_id,
                                       const std::shared_ptr<Client> &client,
                                       bool fallback_allocator, PlasmaObject *result) {
   RAY_LOG(DEBUG) << "attempting to create object " << object_id << " size " << data_size;
+
+  /* rocksdb dummy put
+  WriteOptions wopt;
+  wopt.disableWAL = disableWAL;
+  rocksdb::Status s = db_->Put(wopt, "keyray", "value");
+  std::string value;
+  s = db_->Get(ReadOptions(), "keyray", &value);
+  RAY_LOG(INFO) << "### rocks: value " << value;
+  */
 
   auto entry = GetObjectTableEntry(&store_info_, object_id);
   if (entry != nullptr) {
@@ -978,12 +1035,13 @@ void PlasmaStore::ProcessCreateRequests() {
 
   if (retry_after_ms > 0) {
     // Try to process requests later, after space has been made.
-    create_timer_ = execute_after(io_context_,
-                                  [this]() {
-                                    create_timer_ = nullptr;
-                                    ProcessCreateRequests();
-                                  },
-                                  retry_after_ms);
+    create_timer_ = execute_after(
+        io_context_,
+        [this]() {
+          create_timer_ = nullptr;
+          ProcessCreateRequests();
+        },
+        retry_after_ms);
   }
 }
 
@@ -1019,8 +1077,9 @@ bool PlasmaStore::IsObjectSpillable(const ObjectID &object_id) {
 void PlasmaStore::PrintDebugDump() const {
   RAY_LOG(INFO) << GetDebugDump();
 
-  stats_timer_ = execute_after(io_context_, [this]() { PrintDebugDump(); },
-                               RayConfig::instance().event_stats_print_interval_ms());
+  stats_timer_ = execute_after(
+      io_context_, [this]() { PrintDebugDump(); },
+      RayConfig::instance().event_stats_print_interval_ms());
 }
 
 std::string PlasmaStore::GetDebugDump() const {
