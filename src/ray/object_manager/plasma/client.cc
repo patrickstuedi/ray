@@ -262,6 +262,7 @@ Status PlasmaClient::Impl::HandleCreateReply(const ObjectID &object_id,
                                              const uint8_t *metadata,
                                              uint64_t *retry_with_request_id,
                                              std::shared_ptr<Buffer> *data) {
+  RAY_LOG(INFO) << "### HandleCreateReply, obj_id " << object_id;
   std::vector<uint8_t> buffer;
   RAY_RETURN_NOT_OK(PlasmaReceive(store_conn_, MessageType::PlasmaCreateReply, &buffer));
   ObjectID id;

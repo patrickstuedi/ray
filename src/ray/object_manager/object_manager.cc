@@ -694,10 +694,9 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id, const ObjectID &ob
                                        uint64_t data_size, uint64_t metadata_size,
                                        uint64_t chunk_index, const std::string &data) {
   num_chunks_received_total_++;
-  RAY_LOG(DEBUG) << "ReceiveObjectChunk on " << self_node_id_ << " from " << node_id
-                 << " of object " << object_id << " chunk index: " << chunk_index
-                 << ", chunk data size: " << data.size()
-                 << ", object size: " << data_size;
+  RAY_LOG(INFO) << "ReceiveObjectChunk on " << self_node_id_ << " from " << node_id
+                << " of object " << object_id << " chunk index: " << chunk_index
+                << ", chunk data size: " << data.size() << ", object size: " << data_size;
 
   if (!pull_manager_->IsObjectActive(object_id)) {
     // This object is no longer being actively pulled. Do not create the object.

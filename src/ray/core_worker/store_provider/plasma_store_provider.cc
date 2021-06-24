@@ -67,7 +67,9 @@ CoreWorkerPlasmaStoreProvider::CoreWorkerPlasmaStoreProvider(
     : raylet_client_(raylet_client),
       reference_counter_(reference_counter),
       check_signals_(check_signals) {
-  RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Constructor";
+  std::string tmpname = "ray-" + worker_id.Hex();
+  RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Constructor " << worker_id
+                << ", bin " << tmpname;
 
   if (get_current_call_site != nullptr) {
     get_current_call_site_ = get_current_call_site;
@@ -166,7 +168,8 @@ Status CoreWorkerPlasmaStoreProvider::Create(const std::shared_ptr<Buffer> &meta
                                              const ObjectID &object_id,
                                              const rpc::Address &owner_address,
                                              std::shared_ptr<Buffer> *data) {
-  RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Create, data_size " << data_size;
+  RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Create, obj_id " << object_id
+                << " data_size " << data_size;
   uint64_t retry_with_request_id = 0;
   Status status = store_client_.Create(
       object_id, owner_address, data_size, metadata ? metadata->Data() : nullptr,
@@ -329,6 +332,11 @@ Status CoreWorkerPlasmaStoreProvider::Get(
 
   // First, attempt to fetch all of the required objects once without reconstructing.
   std::vector<ObjectID> id_vector(object_ids.begin(), object_ids.end());
+
+  for (auto _id : id_vector) {
+    RAY_LOG(INFO) << "### CoreWorkerPlasmaStoreProvider::Get, obj_id " << _id;
+  }
+
   int64_t total_size = static_cast<int64_t>(object_ids.size());
   for (int64_t start = 0; start < total_size; start += batch_size) {
     batch_ids.clear();
